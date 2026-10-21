@@ -82,6 +82,7 @@ jobs:
 
           dotnet build agent/installer/Itam.Agent.Installer.wixproj `
             --configuration Release `
+            --no-incremental `
             "-p:PublishDirectory=$publishV1Directory" `
             "-p:MsiProductVersion=0.1.0" `
             "-p:OutputPath=$versionOneDirectory"
@@ -89,6 +90,7 @@ jobs:
 
           dotnet build agent/installer/Itam.Agent.Installer.wixproj `
             --configuration Release `
+            --no-incremental `
             "-p:PublishDirectory=$publishV2Directory" `
             "-p:MsiProductVersion=0.1.1" `
             "-p:OutputPath=$versionTwoDirectory"
