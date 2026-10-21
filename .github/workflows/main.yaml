@@ -2,7 +2,7 @@ name: CI Pipeline - ITAM Platform
 
 on:
   push:
-    branches: [ "devolp" , "newdevelop" ]
+    branches: [ "deve" ]
 
 jobs:
 
