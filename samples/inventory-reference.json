@@ -1,0 +1,244 @@
+{
+    "domain":  "RWD-Steel.local",
+    "osName":  "Microsoft Windows 10 Pro",
+    "loggedInUser":  "RWD-STEEL\\m.hassan",
+    "motherboard":  {
+                        "serialNumber":  "/FCPDPF2/CN129636BN0A37/",
+                        "manufacturer":  "Dell Inc.",
+                        "model":  "0VHKV0"
+                    },
+    "computerName":  "STL-IT02",
+    "osVersion":  "10.0.19045",
+    "gitConfig":  null,
+    "software":  [
+                     {
+                         "publisher":  "AnyDesk Software GmbH",
+                         "name":  "AnyDesk",
+                         "version":  "ad 9.0.14",
+                         "installDate":  null
+                     },
+                     {
+                         "publisher":  "Auslogics Labs Pty Ltd",
+                         "name":  "Auslogics File Recovery",
+                         "version":  "12.0.1.2",
+                         "installDate":  "20250917"
+                     },
+                     {
+                         "publisher":  "CANON INC.",
+                         "name":  "Canon Laser Printer/Scanner/Fax Extended Survey Program",
+                         "version":  "3.0.4",
+                         "installDate":  "20250827"
+                     },
+                     {
+                         "publisher":  "CANON INC.",
+                         "name":  "Canon MF Toolbox 4.9.1.1.mf18",
+                         "version":  "4.9.1.1.mf18",
+                         "installDate":  null
+                     },
+                     {
+                         "publisher":  "CANON INC.",
+                         "name":  "Canon MF3010",
+                         "version":  "3.9.0.1",
+                         "installDate":  null
+                     },
+                     {
+                         "publisher":  "Canon Inc.",
+                         "name":  "Canon ?? UFR II ?????? ????? ????? ?????? ????? ???????",
+                         "version":  "31.05.0.0",
+                         "installDate":  null
+                     },
+                     {
+                         "publisher":  "Microsoft Corporation",
+                         "name":  "Copilot",
+                         "version":  "149.0.4022.66",
+                         "installDate":  "20260622"
+                     },
+                     {
+                         "publisher":  "ALPSALPINE CO., LTD.",
+                         "name":  "Dell Touchpad",
+                         "version":  "10.3201.101.215",
+                         "installDate":  null
+                     },
+                     {
+                         "publisher":  "Dell Inc",
+                         "name":  "Dell WLAN Radio Switch Driver",
+                         "version":  "1.0.0.8",
+                         "installDate":  null
+                     },
+                     {
+                         "publisher":  "Google LLC",
+                         "name":  "Google Chrome",
+                         "version":  "147.0.7727.138",
+                         "installDate":  "20260504"
+                     },
+                     {
+                         "publisher":  "Intel Corporation",
+                         "name":  "Intel(R) Processor Graphics",
+                         "version":  "21.20.16.4678",
+                         "installDate":  null
+                     },
+                     {
+                         "publisher":  "Intel Corporation",
+                         "name":  "Intel® Optane Pinning Explorer Extensions",
+                         "version":  "16.8.4.1011",
+                         "installDate":  "20250621"
+                     },
+                     {
+                         "publisher":  "ITAM",
+                         "name":  "IT Asset Inventory Agent",
+                         "version":  "1.0.2",
+                         "installDate":  "20261013"
+                     },
+                     {
+                         "publisher":  "Microsoft Corporation",
+                         "name":  "Microsoft Edge",
+                         "version":  "149.0.4022.80",
+                         "installDate":  "20260622"
+                     },
+                     {
+                         "publisher":  "Microsoft Corporation",
+                         "name":  "Microsoft Edge WebView2 Runtime",
+                         "version":  "149.0.4022.80",
+                         "installDate":  "20260622"
+                     },
+                     {
+                         "publisher":  "Microsoft Corporation",
+                         "name":  "Microsoft Office Professional Plus 2016 - en-us",
+                         "version":  "16.0.20026.20182",
+                         "installDate":  null
+                     },
+                     {
+                         "publisher":  "Microsoft Corporation",
+                         "name":  "Microsoft Project - en-us",
+                         "version":  "16.0.20026.20182",
+                         "installDate":  null
+                     },
+                     {
+                         "publisher":  "Microsoft Corporation",
+                         "name":  "Microsoft Update Health Tools",
+                         "version":  "3.74.0.0",
+                         "installDate":  "20250523"
+                     },
+                     {
+                         "publisher":  "Microsoft Corporation",
+                         "name":  "Microsoft Visio - en-us",
+                         "version":  "16.0.20026.20182",
+                         "installDate":  null
+                     },
+                     {
+                         "publisher":  "Microsoft Corporation",
+                         "name":  "Microsoft Visual C++ 2015-2022 Redistributable (x64) - 14.44.35211",
+                         "version":  "14.44.35211.0",
+                         "installDate":  null
+                     },
+                     {
+                         "publisher":  "Microsoft Corporation",
+                         "name":  "Microsoft Visual C++ 2015-2022 Redistributable (x86) - 14.44.35211",
+                         "version":  "14.44.35211.0",
+                         "installDate":  null
+                     },
+                     {
+                         "publisher":  "Microsoft Corporation",
+                         "name":  "Microsoft Visual C++ 2022 X64 Additional Runtime - 14.44.35211",
+                         "version":  "14.44.35211",
+                         "installDate":  "20260212"
+                     },
+                     {
+                         "publisher":  "Microsoft Corporation",
+                         "name":  "Microsoft Visual C++ 2022 X64 Minimum Runtime - 14.44.35211",
+                         "version":  "14.44.35211",
+                         "installDate":  "20260212"
+                     },
+                     {
+                         "publisher":  "Microsoft Corporation",
+                         "name":  "Microsoft Visual C++ 2022 X86 Additional Runtime - 14.44.35211",
+                         "version":  "14.44.35211",
+                         "installDate":  "20260212"
+                     },
+                     {
+                         "publisher":  "Microsoft Corporation",
+                         "name":  "Microsoft Visual C++ 2022 X86 Minimum Runtime - 14.44.35211",
+                         "version":  "14.44.35211",
+                         "installDate":  "20260212"
+                     },
+                     {
+                         "publisher":  "Microsoft Corporation",
+                         "name":  "Office 16 Click-to-Run Extensibility Component",
+                         "version":  "16.0.20026.20076",
+                         "installDate":  "20260622"
+                     },
+                     {
+                         "publisher":  "Realtek Semiconductor Corp.",
+                         "name":  "Realtek Audio COM Components",
+                         "version":  "1.0.2",
+                         "installDate":  "20250323"
+                     },
+                     {
+                         "publisher":  "Realtek Semiconductor Corp.",
+                         "name":  "Realtek High Definition Audio Driver",
+                         "version":  "6.0.1.6095",
+                         "installDate":  null
+                     },
+                     {
+                         "publisher":  "Piriform",
+                         "name":  "Recuva",
+                         "version":  "1.53",
+                         "installDate":  null
+                     },
+                     {
+                         "publisher":  "SD Association",
+                         "name":  "SD Card Formatter",
+                         "version":  "5.0.3",
+                         "installDate":  "20250710"
+                     },
+                     {
+                         "publisher":  "SysTools Software Pvt. Ltd.",
+                         "name":  "SysTools Hard Drive Data Recovery v18.6",
+                         "version":  "v18.6",
+                         "installDate":  "20250917"
+                     },
+                     {
+                         "publisher":  "GlavSoft LLC.",
+                         "name":  "TightVNC",
+                         "version":  "2.8.59.0",
+                         "installDate":  "20250420"
+                     },
+                     {
+                         "publisher":  "Microsoft Corporation",
+                         "name":  "Update for x64-based Windows Systems (KB5001716)",
+                         "version":  "8.94.0.0",
+                         "installDate":  "20250803"
+                     },
+                     {
+                         "publisher":  "win.rar GmbH",
+                         "name":  "WinRAR 5.30 (32-bit)",
+                         "version":  "5.30.0",
+                         "installDate":  null
+                     }
+                 ],
+    "ramModules":  [
+                       {
+                           "speedMhz":  2133,
+                           "slot":  "BANK 2",
+                           "capacityGb":  8,
+                           "serialNumber":  "12121212"
+                       }
+                   ],
+    "disks":  [
+                  {
+                      "serialNumber":  "165005804480",
+                      "totalSpaceGb":  238.47,
+                      "freeSpaceGb":  150.19,
+                      "model":  "SanDisk SD8SN8U-256G-1006",
+                      "type":  "HDD"
+                  }
+              ],
+    "osBuild":  "19045",
+    "cpu":  {
+                "threads":  4,
+                "cores":  2,
+                "architecture":  "x64",
+                "clockSpeedMhz":  2501,
+                "model":  "Intel(R) Core(TM) i5-6300U CPU @ 2.40GHz"
+            }
+}

@@ -1,0 +1,28 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+    Name="ITAM Windows Inventory Collector"
+    Manufacturer="ITAM Platform"
+    Version="$(var.ProductVersion)"
+    UpgradeCode="{A3620304-2F3C-41E6-BEB5-1B72C145BFF0}"
+    Scope="perMachine">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of the ITAM inventory collector is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+    <Feature Id="Complete" Title="ITAM Windows Inventory Collector" Level="1">
+      <ComponentGroupRef Id="AgentFiles" />
+    </Feature>
+  </Package>
+
+  <Fragment>
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="ITAMFolder" Name="ITAM">
+        <Directory Id="INSTALLFOLDER" Name="Inventory Agent" />
+      </Directory>
+    </StandardDirectory>
+  </Fragment>
+
+  <Fragment>
+    <ComponentGroup Id="AgentFiles" Directory="INSTALLFOLDER">
+      <Files Include="$(var.PublishDirectory)\**" />
+    </ComponentGroup>
+  </Fragment>
+</Wix>

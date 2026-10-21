@@ -1,0 +1,9 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <OutputName>ITAM.InventoryAgent</OutputName>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <PublishDirectory Condition="'$(PublishDirectory)' == ''">$(MSBuildThisFileDirectory)..\publish</PublishDirectory>
+    <DefineConstants>PublishDirectory=$(PublishDirectory);ProductVersion=$(Version)</DefineConstants>
+  </PropertyGroup>
+</Project>

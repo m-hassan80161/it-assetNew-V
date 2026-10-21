@@ -340,6 +340,9 @@ Device management allows administrators to monitor and maintain the full IT esta
 ### Operational value
 This gives IT teams a single operational view of device health, version compliance, and onboarding readiness without manually reconciling spreadsheets or direct AD exports.
 
+### Managed agent API (initial backend)
+The backend includes an initial authenticated managed-agent enrollment, check-in, credential lifecycle, and network-inventory API. The existing PowerShell collector and public legacy inventory endpoint remain available. Configuration polling, durable jobs/campaigns, release management, a React administration UI, and the C# Windows agent are not included yet. See [Agent Management API and Network Inventory](./docs/AGENT-MANAGEMENT.md).
+
 ---
 
 ## Platform Summary

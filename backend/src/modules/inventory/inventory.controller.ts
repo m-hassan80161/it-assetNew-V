@@ -9,6 +9,7 @@ import {
   Put,
   Query,
   Req,
+  UnauthorizedException,
   UseGuards,
 } from "@nestjs/common";
 import { Request } from "express";
@@ -112,8 +113,15 @@ export class InventoryController {
   }
 
   @Delete(":id")
-  remove(@Param("id") id: string) {
-    return this.inventoryService.deleteDevice(id);
+  remove(
+    @Req() request: AuthenticatedRequest,
+    @Param("id") id: string,
+  ) {
+    if (!request.user) throw new UnauthorizedException("Authentication required");
+    return this.inventoryService.deleteDevice(id, {
+      id: request.user.id,
+      username: request.user.username,
+    });
   }
 
   @Get(":id")

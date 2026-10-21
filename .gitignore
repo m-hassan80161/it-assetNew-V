@@ -77,6 +77,8 @@ lerna-debug.log*
 *.swp
 *.swo
 *.tmp
+
+ITAM_AGENT_UNIFIED_SPEC.md
 *#
 
 #

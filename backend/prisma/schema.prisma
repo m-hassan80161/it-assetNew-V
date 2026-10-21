@@ -37,8 +37,131 @@ model Device {
   complianceAlerts ComplianceAlert[]
   components       DeviceComponent[]
   componentHistory DeviceComponentHistory[]
+  managedAgent     ManagedAgent?
+  networkInterfaces NetworkInterface[]
+  agentEnrollmentGrants AgentEnrollmentGrant[]
+  agentAuditEvents AgentAuditEvent[]
 
   @@index([computerName])
+}
+
+enum AgentRegistrationStatus {
+  ENABLED
+  DISABLED
+  REVOKED
+}
+
+enum AgentGrantPurpose {
+  ENROLLMENT
+  RECOVERY
+  ROTATION
+}
+
+enum NetworkInterfaceType {
+  ETHERNET
+  WIFI
+  VPN
+  VIRTUAL
+  OTHER
+}
+
+enum NetworkAddressFamily {
+  IPV4
+  IPV6
+}
+
+enum NetworkAddressScope {
+  PRIVATE
+  PUBLIC
+  LINK_LOCAL
+  APIPA
+  UNIQUE_LOCAL
+  SHARED
+  DOCUMENTATION
+  RESERVED
+}
+
+model ManagedAgent {
+  id                         String                   @id @default(uuid())
+  deviceId                   String?                  @unique
+  device                     Device?                  @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  status                     AgentRegistrationStatus  @default(ENABLED)
+  credentialHash             String?                  @unique
+  pendingCredentialHash      String?                  @unique
+  pendingCredentialExpiresAt DateTime?
+  credentialVersion          Int                      @default(1)
+  agentVersion               String?
+  operatingSystem            String?
+  lastSeenAt                 DateTime?
+  lastInventoryAt            DateTime?
+  inventoryRevision          BigInt                   @default(0)
+  lastAppliedInventoryRevision BigInt?
+  lastAppliedInventoryHash   String?
+  createdAt                  DateTime                 @default(now())
+  updatedAt                  DateTime                 @updatedAt
+  auditEvents                AgentAuditEvent[]
+
+  @@index([status, lastSeenAt])
+}
+
+model AgentEnrollmentGrant {
+  id                String           @id @default(uuid())
+  tokenHash         String           @unique
+  purpose           AgentGrantPurpose
+  deviceId          String?
+  device            Device?          @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  allowDeviceCreate Boolean          @default(false)
+  createdByAdminId  String
+  expiresAt         DateTime
+  consumedAt        DateTime?
+  revokedAt         DateTime?
+  createdAt         DateTime         @default(now())
+
+  @@index([deviceId, purpose])
+  @@index([expiresAt, consumedAt])
+}
+
+model AgentAuditEvent {
+  id             String         @id @default(uuid())
+  agentId        String?
+  agent          ManagedAgent?  @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  deviceId       String?
+  device         Device?        @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  actorAdminId   String?
+  actorUsername  String?
+  eventType      String
+  outcome        String
+  details        Json?
+  createdAt      DateTime       @default(now())
+
+  @@index([agentId, createdAt])
+  @@index([deviceId, createdAt])
+  @@index([actorAdminId, createdAt])
+}
+
+model NetworkInterface {
+  id            String               @id @default(uuid())
+  deviceId      String
+  device        Device               @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  name          String
+  interfaceType NetworkInterfaceType
+  macAddress    String?
+  ipAddresses   NetworkAddress[]
+
+  @@index([deviceId])
+}
+
+model NetworkAddress {
+  id                  String               @id @default(uuid())
+  networkInterfaceId  String
+  networkInterface    NetworkInterface     @relation(fields: [networkInterfaceId], references: [id], onDelete: Cascade)
+  address             String
+  family              NetworkAddressFamily
+  prefixLength        Int
+  scope               NetworkAddressScope
+
+  @@unique([networkInterfaceId, address])
+  @@index([address])
 }
 
 enum BranchPatternSource {
@@ -157,7 +280,7 @@ model MotherboardInfo {
   device       Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
   manufacturer String
   model        String
-  serialNumber String
+  serialNumber String?
 }
 
 model DeviceComponent {
@@ -255,7 +378,6 @@ model InstalledSoftware {
   masterSoftwareId String?
   masterSoftware   MasterSoftware?  @relation(fields: [masterSoftwareId], references: [id])
   complianceStatus ComplianceStatus @default(NOT_TRACKED)
-  lastCheckedAt    DateTime?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
@@ -269,7 +391,6 @@ model MasterSoftware {
   name               String              @unique
   minRequiredVersion String
   isMandatory        Boolean             @default(false)
-  description        String?
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   installedSoftware  InstalledSoftware[]
@@ -283,7 +404,6 @@ model ComplianceAlert {
   device         Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
   softwareName   String
   newVersion     String
-  currentVersion String?
   laggingCount   Int      @default(0)
   message        String
   resolved       Boolean  @default(false)

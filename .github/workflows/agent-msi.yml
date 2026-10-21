@@ -1,0 +1,203 @@
+name: C# Agent MSI
+
+on:
+  push:
+    paths:
+      - "agent/**"
+      - ".github/workflows/agent-msi.yml"
+  pull_request:
+    paths:
+      - "agent/**"
+      - ".github/workflows/agent-msi.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-package:
+    name: Test, package, and validate Windows MSI
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Run inventory contract tests
+        shell: pwsh
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP "itam-agent-contract-tests.log"
+          dotnet run --configuration Release --project agent/tests/Itam.Agent.ContractTests/Itam.Agent.ContractTests.csproj *> $log
+          $exitCode = $LASTEXITCODE
+          Get-Content $log
+          if ($exitCode -ne 0) { throw "Inventory contract tests failed." }
+
+      - name: Run collector and runtime tests
+        shell: pwsh
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP "itam-agent-collector-tests.log"
+          dotnet run --configuration Release --project agent/tests/Itam.Agent.CollectorTests/Itam.Agent.CollectorTests.csproj *> $log
+          $exitCode = $LASTEXITCODE
+          Get-Content $log
+          if ($exitCode -ne 0) { throw "Collector and runtime tests failed." }
+
+      - name: Publish self-contained x64 upgrade-test payloads
+        shell: pwsh
+        run: |
+          $publishV1Directory = Join-Path $env:RUNNER_TEMP "itam-agent-publish-v1"
+          $publishV2Directory = Join-Path $env:RUNNER_TEMP "itam-agent-publish-v2"
+          dotnet publish agent/src/Itam.Agent.Windows/Itam.Agent.Windows.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            -p:Version=0.1.0 `
+            -p:PublishSingleFile=false `
+            --output $publishV1Directory
+          if ($LASTEXITCODE -ne 0) { throw "Version 0.1.0 agent publish failed." }
+          dotnet publish agent/src/Itam.Agent.Windows/Itam.Agent.Windows.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            -p:Version=0.1.1 `
+            -p:PublishSingleFile=false `
+            --output $publishV2Directory
+          if ($LASTEXITCODE -ne 0) { throw "Version 0.1.1 agent publish failed." }
+          if (-not (Test-Path (Join-Path $publishV2Directory "Itam.Agent.Windows.exe"))) {
+            throw "Published agent executable was not found."
+          }
+
+      - name: Build current and upgrade-test MSIs
+        shell: pwsh
+        run: |
+          $publishV1Directory = Join-Path $env:RUNNER_TEMP "itam-agent-publish-v1"
+          $publishV2Directory = Join-Path $env:RUNNER_TEMP "itam-agent-publish-v2"
+          $versionOneDirectory = Join-Path $env:RUNNER_TEMP "itam-agent-msi-v1"
+          $versionTwoDirectory = Join-Path $env:RUNNER_TEMP "itam-agent-msi-v2"
+          New-Item -ItemType Directory -Force -Path $versionOneDirectory, $versionTwoDirectory | Out-Null
+
+          dotnet build agent/installer/Itam.Agent.Installer.wixproj `
+            --configuration Release `
+            "-p:PublishDirectory=$publishV1Directory" `
+            "-p:Version=0.1.0" `
+            "-p:OutputPath=$versionOneDirectory"
+          if ($LASTEXITCODE -ne 0) { throw "Version 0.1.0 MSI build failed." }
+
+          dotnet build agent/installer/Itam.Agent.Installer.wixproj `
+            --configuration Release `
+            "-p:PublishDirectory=$publishV2Directory" `
+            "-p:Version=0.1.1" `
+            "-p:OutputPath=$versionTwoDirectory"
+          if ($LASTEXITCODE -ne 0) { throw "Version 0.1.1 MSI build failed." }
+
+      - name: Validate MSI architecture and version metadata
+        shell: pwsh
+        run: |
+          function Get-MsiMetadata([string]$path) {
+            $installer = New-Object -ComObject WindowsInstaller.Installer
+            $database = $installer.OpenDatabase($path, 0)
+            $view = $database.OpenView("SELECT ``Value`` FROM ``Property`` WHERE ``Property``='ProductVersion'")
+            $view.Execute()
+            $record = $view.Fetch()
+            $version = $record.StringData(1)
+            $template = $database.SummaryInformation(0).Property(7)
+            [pscustomobject]@{ Version = $version; Template = $template }
+          }
+
+          $versionOneDirectory = Join-Path $env:RUNNER_TEMP "itam-agent-msi-v1"
+          $versionTwoDirectory = Join-Path $env:RUNNER_TEMP "itam-agent-msi-v2"
+          $versionOneMsi = Get-ChildItem $versionOneDirectory -Filter "*.msi" -Recurse | Select-Object -First 1
+          $versionTwoMsi = Get-ChildItem $versionTwoDirectory -Filter "*.msi" -Recurse | Select-Object -First 1
+          if (-not $versionOneMsi -or -not $versionTwoMsi) { throw "An expected MSI was not built." }
+
+          $metadataOne = Get-MsiMetadata $versionOneMsi.FullName
+          $metadataTwo = Get-MsiMetadata $versionTwoMsi.FullName
+          if ($metadataOne.Version -ne "0.1.0" -or $metadataTwo.Version -ne "0.1.1") {
+            throw "MSI product-version metadata does not match the requested versions."
+          }
+          if ($metadataOne.Template -notmatch "^x64;" -or $metadataTwo.Template -notmatch "^x64;") {
+            throw "An MSI does not declare the expected x64 platform."
+          }
+          $currentExecutable = Join-Path $env:RUNNER_TEMP "itam-agent-publish-v2\Itam.Agent.Windows.exe"
+          if (-not (Test-Path $currentExecutable)) { throw "The current-version executable was not published." }
+          if ((Get-Item $currentExecutable).VersionInfo.ProductVersion -notmatch "^0\.1\.1") {
+            throw "The executable version does not match the current package version."
+          }
+
+      - name: Test MSI installation, major upgrade, and uninstall
+        shell: pwsh
+        run: |
+          $versionOneDirectory = Join-Path $env:RUNNER_TEMP "itam-agent-msi-v1"
+          $versionTwoDirectory = Join-Path $env:RUNNER_TEMP "itam-agent-msi-v2"
+          $versionOneMsi = Get-ChildItem $versionOneDirectory -Filter "*.msi" -Recurse | Select-Object -First 1
+          $versionTwoMsi = Get-ChildItem $versionTwoDirectory -Filter "*.msi" -Recurse | Select-Object -First 1
+          if (-not $versionOneMsi -or -not $versionTwoMsi) { throw "An expected MSI was not built." }
+
+          $installDirectory = Join-Path $env:ProgramFiles "ITAM\Inventory Agent"
+          $agentExecutable = Join-Path $installDirectory "Itam.Agent.Windows.exe"
+          $installLog = Join-Path $env:RUNNER_TEMP "itam-agent-install.log"
+          $upgradeLog = Join-Path $env:RUNNER_TEMP "itam-agent-upgrade.log"
+          $uninstallLog = Join-Path $env:RUNNER_TEMP "itam-agent-uninstall.log"
+
+          $install = Start-Process msiexec.exe -Wait -PassThru -ArgumentList @(
+            "/i", "`"$($versionOneMsi.FullName)`"", "/qn", "/norestart", "/l*v", "`"$installLog`""
+          )
+          if ($install.ExitCode -notin @(0, 3010)) { throw "Initial MSI install failed with exit code $($install.ExitCode)." }
+          if (-not (Test-Path $agentExecutable)) { throw "Installed agent executable was not found." }
+
+          $configDirectory = Join-Path $env:RUNNER_TEMP "itam-agent-config-test"
+          New-Item -ItemType Directory -Force -Path $configDirectory | Out-Null
+          $testConfiguration = Join-Path $configDirectory "settings.json"
+          @{
+            backendBaseUrl = "https://itam.example.invalid/api/v1"
+            logDirectory = $configDirectory
+          } | ConvertTo-Json | Set-Content -Path $testConfiguration -Encoding utf8
+          & $agentExecutable validate-config $testConfiguration
+          if ($LASTEXITCODE -ne 0) { throw "Installed executable configuration check failed." }
+
+          $upgrade = Start-Process msiexec.exe -Wait -PassThru -ArgumentList @(
+            "/i", "`"$($versionTwoMsi.FullName)`"", "/qn", "/norestart", "/l*v", "`"$upgradeLog`""
+          )
+          if ($upgrade.ExitCode -notin @(0, 3010)) { throw "Major upgrade failed with exit code $($upgrade.ExitCode)." }
+          if (-not (Test-Path $agentExecutable)) { throw "Agent executable is missing after upgrade." }
+
+          $uninstall = Start-Process msiexec.exe -Wait -PassThru -ArgumentList @(
+            "/x", "`"$($versionTwoMsi.FullName)`"", "/qn", "/norestart", "/l*v", "`"$uninstallLog`""
+          )
+          if ($uninstall.ExitCode -notin @(0, 3010)) { throw "MSI uninstall failed with exit code $($uninstall.ExitCode)." }
+          if (Test-Path $agentExecutable) { throw "Agent files remain after uninstall." }
+
+      - name: Prepare current MSI and SHA-256 artifact
+        shell: pwsh
+        run: |
+          $versionTwoDirectory = Join-Path $env:RUNNER_TEMP "itam-agent-msi-v2"
+          $artifactDirectory = Join-Path $env:RUNNER_TEMP "itam-agent-artifact"
+          New-Item -ItemType Directory -Force -Path $artifactDirectory | Out-Null
+          $msi = Get-ChildItem $versionTwoDirectory -Filter "*.msi" -Recurse | Select-Object -First 1
+          if (-not $msi) { throw "The release MSI was not found." }
+          Copy-Item $msi.FullName $artifactDirectory
+          $artifactMsi = Join-Path $artifactDirectory $msi.Name
+          $hash = Get-FileHash $artifactMsi -Algorithm SHA256
+          "$($hash.Hash)  $($msi.Name)" | Set-Content -Path "$artifactMsi.sha256" -Encoding ascii
+
+      - name: Upload unsigned MSI artifact and checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: itam-windows-inventory-agent
+          path: ${{ runner.temp }}/itam-agent-artifact/*
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload diagnostic logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: itam-agent-msi-failure-diagnostics
+          path: |
+            ${{ runner.temp }}/itam-agent-*.log
+          if-no-files-found: ignore
+          retention-days: 7

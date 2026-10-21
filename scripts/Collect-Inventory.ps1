@@ -1,6 +1,8 @@
 param(
-    [string]$ApiEndpoint = "http://10.22.28.12:3000/api/v1/inventory",
-    [bool]$SkipCertValidation = $false
+    [string]$ApiEndpoint = "http://10.22.28.82:3000/api/v1/inventory",
+    [bool]$SkipCertValidation = $false,
+    [string]$JsonOutputPath,
+    [switch]$ExportJsonOnly
 )
 
 Set-StrictMode -Version Latest
@@ -72,6 +74,22 @@ function Get-SafeProperty {
     }
 
     return $DefaultValue
+}
+
+function Get-NormalizedSerialNumber {
+    param($Value)
+
+    if ($null -eq $Value) {
+        return $null
+    }
+
+    $serialNumber = $Value.ToString().Trim()
+
+    if ($serialNumber.Length -eq 0) {
+        return $null
+    }
+
+    return $serialNumber
 }
 
 # ============================================================
@@ -293,12 +311,7 @@ try {
             "Unknown"
         }
 
-        serialNumber = if ($serial) {
-            $serial.ToString().Trim()
-        }
-        else {
-            $null
-        }
+        serialNumber = Get-NormalizedSerialNumber $serial
     }
 
     Write-Log `
@@ -355,12 +368,7 @@ try {
 
             speedMhz = [int]$speed
 
-            serialNumber = if ($serial) {
-                $serial.ToString().Trim()
-            }
-            else {
-                $null
-            }
+            serialNumber = Get-NormalizedSerialNumber $serial
 
             slot = if ($slot) {
                 $slot.ToString().Trim()
@@ -562,12 +570,7 @@ try {
 
             model = $model
 
-            serialNumber = if ($disk.SerialNumber) {
-                $disk.SerialNumber.ToString().Trim()
-            }
-            else {
-                $null
-            }
+            serialNumber = Get-NormalizedSerialNumber $disk.SerialNumber
 
             totalSpaceGb = $totalGb
 
@@ -783,6 +786,34 @@ $payloadJson = $payloadObject |
 
 Write-Log `
     "Payload size: $($payloadJson.Length) bytes"
+
+if ($JsonOutputPath) {
+
+    $jsonFullPath = [System.IO.Path]::GetFullPath($JsonOutputPath)
+    $jsonDirectory = [System.IO.Path]::GetDirectoryName($jsonFullPath)
+
+    if ($jsonDirectory -and -not (Test-Path -LiteralPath $jsonDirectory)) {
+        [System.IO.Directory]::CreateDirectory($jsonDirectory) | Out-Null
+    }
+
+    $utf8WithoutBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText(
+        $jsonFullPath,
+        $payloadJson,
+        $utf8WithoutBom
+    )
+
+    Write-Log "JSON saved to: $jsonFullPath" "SUCCESS"
+}
+
+if ($ExportJsonOnly) {
+    if (-not $JsonOutputPath) {
+        throw "JsonOutputPath is required when ExportJsonOnly is specified."
+    }
+
+    Write-Log "Export-only mode: inventory was not sent to the API."
+    return
+}
 
 # ============================================================
 # 9. TEST API CONNECTION

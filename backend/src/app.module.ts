@@ -8,6 +8,7 @@ import { AuthModule } from "./modules/auth/auth.module";
 import { PrismaModule } from "./common/prisma/prisma.module";
 import { TicketsModule } from "./modules/tickets/tickets.module";
 import { LogsModule } from "./modules/logs/logs.module";
+import { AgentsModule } from "./modules/agents/agents.module";
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { LogsModule } from "./modules/logs/logs.module";
     OnboardingModule, // depends on AD + FileServer + SoftwareCompliance
     TicketsModule,
     LogsModule,
+    AgentsModule,
   ],
 })
 export class AppModule {}

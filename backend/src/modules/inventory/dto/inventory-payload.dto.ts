@@ -1,12 +1,16 @@
 import { Type } from "class-transformer";
 import {
+  ArrayMaxSize,
   IsArray,
   IsNumber,
   IsOptional,
   IsString,
+  Matches,
   ValidateNested,
+  ValidateIf,
 } from "class-validator";
 import { DeviceComponentDto } from "./device-component.dto";
+import { NetworkInterfaceDto } from "./network-interface.dto";
 
 export class CpuDto {
   @IsString() model: string;
@@ -19,7 +23,7 @@ export class CpuDto {
 export class MotherboardDto {
   @IsString() manufacturer: string;
   @IsString() model: string;
-  @IsString() serialNumber: string;
+  @IsOptional() @IsString() serialNumber?: string | null;
 }
 
 export class RamModuleDto {
@@ -51,7 +55,9 @@ export class GitConfigDto {
 }
 
 export class InventoryPayloadDto {
-  @IsString() computerName: string;
+  @IsString()
+  @Matches(/^[^\u0000-\u001f\u007f-\u009f]*$/u)
+  computerName: string;
   @IsOptional() @IsString() loggedInUser?: string;
   @IsOptional() @IsString() osName?: string;
   @IsOptional() @IsString() osVersion?: string;
@@ -78,4 +84,11 @@ export class InventoryPayloadDto {
 
   @IsOptional() @ValidateNested() @Type(() => GitConfigDto)
   gitConfig?: GitConfigDto;
+
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsArray()
+  @ArrayMaxSize(64)
+  @ValidateNested({ each: true })
+  @Type(() => NetworkInterfaceDto)
+  networkInterfaces?: NetworkInterfaceDto[];
 }

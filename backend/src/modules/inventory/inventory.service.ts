@@ -1,16 +1,55 @@
 import {
   BadRequestException,
+  ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
+  UnauthorizedException,
 } from "@nestjs/common";
-import { BranchPatternSource, Prisma, UserRole } from "@prisma/client";
+import {
+  AgentRegistrationStatus,
+  BranchPatternSource,
+  Prisma,
+  UserRole,
+} from "@prisma/client";
+import { createHash } from "node:crypto";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { DeviceComponentDto } from "./dto/device-component.dto";
 import { InventoryPayloadDto } from "./dto/inventory-payload.dto";
 import { BranchPatternDto } from "./dto/branch-pattern.dto";
+import {
+  assertComputerNameHasNoControlCharacters,
+  assertHostnameAvailable,
+  lockHostname,
+} from "./hostname-conflict";
+import {
+  normalizeNetworkInterfaces,
+  replaceNetworkSnapshot,
+} from "./network-inventory";
 
 type ComponentSnapshot = Prisma.InputJsonObject;
+type IngestedDevice = { id: string; computerName: string; duplicate?: boolean };
+
+class StaleInventoryRevisionException extends ConflictException {}
+
+function stableStringify(value: unknown): string {
+  if (value === null) return "null";
+  if (Array.isArray(value)) {
+    return `[${value
+      .map((item) => (item === undefined ? "null" : stableStringify(item)))
+      .join(",")}]`;
+  }
+  if (typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, item]) => item !== undefined)
+      .sort(([left], [right]) => left.localeCompare(right));
+    return `{${entries
+      .map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
+}
 
 @Injectable()
 export class InventoryService {
@@ -26,53 +65,81 @@ export class InventoryService {
    * device in a half-updated state.
    */
   async ingest(payload: InventoryPayloadDto) {
-    const device = await this.prisma.$transaction(async (tx) => {
-      const dev = await tx.device.upsert({
-        where: { computerName: payload.computerName },
-        create: {
-          computerName: payload.computerName,
-          loggedInUser: payload.loggedInUser,
-          osName: payload.osName,
-          osVersion: payload.osVersion,
-          osBuild: payload.osBuild,
-          domain: payload.domain,
-        },
-        update: {
-          loggedInUser: payload.loggedInUser,
-          osName: payload.osName,
-          osVersion: payload.osVersion,
-          osBuild: payload.osBuild,
-          domain: payload.domain,
-          lastSeenAt: new Date(),
-        },
-      });
+    return this.ingestForDevice(payload);
+  }
+
+  async ingestForManagedAgent(
+    agentId: string,
+    deviceId: string,
+    payload: InventoryPayloadDto,
+    snapshotRevision: bigint,
+  ) {
+    return this.ingestForDevice(payload, {
+      agentId,
+      deviceId,
+      snapshotRevision,
+    });
+  }
+
+  private async ingestForDevice(
+    payload: InventoryPayloadDto,
+    managedAgent?: {
+      agentId: string;
+      deviceId: string;
+      snapshotRevision: bigint;
+    },
+  ) {
+    assertComputerNameHasNoControlCharacters(payload.computerName);
+    const networkSnapshot =
+      payload.networkInterfaces === undefined
+        ? undefined
+        : normalizeNetworkInterfaces(payload.networkInterfaces);
+    if (networkSnapshot !== undefined && !managedAgent) {
+      throw new ForbiddenException(
+        "Network inventory requires an authenticated managed agent",
+      );
+    }
+    const snapshotHash = managedAgent
+      ? createHash("sha256").update(stableStringify(payload)).digest("hex")
+      : undefined;
+    const device = await this.prisma.$transaction(async (tx): Promise<IngestedDevice> => {
+      const dev: IngestedDevice = managedAgent
+        ? await this.updateManagedDevice(
+            tx,
+            managedAgent,
+            payload,
+            snapshotHash!,
+          )
+        : await this.upsertLegacyDevice(tx, payload);
+      if (dev.duplicate) return dev;
+      const deviceId = dev.id;
 
       await tx.cpuInfo.upsert({
-        where: { deviceId: dev.id },
-        create: { deviceId: dev.id, ...payload.cpu },
+        where: { deviceId },
+        create: { deviceId, ...payload.cpu },
         update: { ...payload.cpu },
       });
 
       await tx.motherboardInfo.upsert({
-        where: { deviceId: dev.id },
-        create: { deviceId: dev.id, ...payload.motherboard },
+        where: { deviceId },
+        create: { deviceId, ...payload.motherboard },
         update: { ...payload.motherboard },
       });
 
       // Replace-all strategy for collection children (simplest correctness
       // guarantee for a "current snapshot" model)
-      await tx.ramModule.deleteMany({ where: { deviceId: dev.id } });
+      await tx.ramModule.deleteMany({ where: { deviceId } });
       if (payload.ramModules?.length) {
         await tx.ramModule.createMany({
-          data: payload.ramModules.map((r) => ({ deviceId: dev.id, ...r })),
+          data: payload.ramModules.map((r) => ({ deviceId, ...r })),
         });
       }
 
-      await tx.diskDrive.deleteMany({ where: { deviceId: dev.id } });
+      await tx.diskDrive.deleteMany({ where: { deviceId } });
       if (payload.disks?.length) {
         await tx.diskDrive.createMany({
           data: payload.disks.map((d) => ({
-            deviceId: dev.id,
+            deviceId,
             type: d.type as any,
             serialNumber: d.serialNumber,
             totalSpaceGb: d.totalSpaceGb,
@@ -83,7 +150,7 @@ export class InventoryService {
 
       if (payload.components !== undefined) {
         const manualComponents = await tx.deviceComponent.findMany({
-          where: { deviceId: dev.id, source: "MANUAL" },
+          where: { deviceId, source: "MANUAL" },
           select: { category: true, name: true },
         });
         const manualComponentKeys = new Set(
@@ -94,7 +161,7 @@ export class InventoryService {
         );
 
         await tx.deviceComponent.deleteMany({
-          where: { deviceId: dev.id, source: "INVENTORY" },
+          where: { deviceId, source: "INVENTORY" },
         });
 
         const discoveredComponents = payload.components.filter((component) => {
@@ -104,7 +171,7 @@ export class InventoryService {
         if (discoveredComponents.length) {
           await tx.deviceComponent.createMany({
             data: discoveredComponents.map((component) => ({
-              deviceId: dev.id,
+              deviceId,
               ...this.normalizeComponent(component),
               source: "INVENTORY",
             })),
@@ -112,11 +179,11 @@ export class InventoryService {
         }
       }
 
-      await tx.installedSoftware.deleteMany({ where: { deviceId: dev.id } });
+      await tx.installedSoftware.deleteMany({ where: { deviceId } });
       if (payload.software?.length) {
         await tx.installedSoftware.createMany({
           data: payload.software.map((item) => ({
-            deviceId: dev.id,
+            deviceId,
             name: item.name,
             version: item.version,
             publisher: item.publisher,
@@ -127,17 +194,157 @@ export class InventoryService {
 
       if (payload.gitConfig) {
         await tx.gitConfig.upsert({
-          where: { deviceId: dev.id },
-          create: { deviceId: dev.id, ...payload.gitConfig },
+          where: { deviceId },
+          create: { deviceId, ...payload.gitConfig },
           update: { ...payload.gitConfig },
         });
       }
 
+      await replaceNetworkSnapshot(tx, deviceId, networkSnapshot);
+
+      if (managedAgent) {
+        await tx.managedAgent.update({
+          where: { id: managedAgent.agentId },
+          data: {
+            lastInventoryAt: new Date(),
+            lastAppliedInventoryRevision: managedAgent.snapshotRevision,
+            lastAppliedInventoryHash: snapshotHash,
+          },
+        });
+      }
+
       return dev;
+    }).catch(async (error: unknown) => {
+      if (
+        managedAgent &&
+        error instanceof ConflictException &&
+        !(error instanceof StaleInventoryRevisionException)
+      ) {
+        await this.prisma.agentAuditEvent.create({
+          data: {
+            agentId: managedAgent.agentId,
+            deviceId: managedAgent.deviceId,
+            eventType: "HOSTNAME_CONFLICT_REJECTED",
+            outcome: "REJECTED",
+            details: { source: "managed-inventory" },
+          },
+        });
+      }
+      throw error;
     });
 
+    if (device.duplicate) {
+      return { deviceId: device.id, status: "ok", duplicate: true };
+    }
     this.logger.log(`Ingested inventory for ${device.computerName}`);
     return { deviceId: device.id, status: "ok" };
+  }
+
+  private async upsertLegacyDevice(
+    tx: Prisma.TransactionClient,
+    payload: InventoryPayloadDto,
+  ) {
+    return tx.device.upsert({
+      where: { computerName: payload.computerName },
+      create: {
+        computerName: payload.computerName,
+        loggedInUser: payload.loggedInUser,
+        osName: payload.osName,
+        osVersion: payload.osVersion,
+        osBuild: payload.osBuild,
+        domain: payload.domain,
+      },
+      update: {
+        loggedInUser: payload.loggedInUser,
+        osName: payload.osName,
+        osVersion: payload.osVersion,
+        osBuild: payload.osBuild,
+        domain: payload.domain,
+        lastSeenAt: new Date(),
+      },
+      select: { id: true, computerName: true },
+    });
+  }
+
+  private async updateManagedDevice(
+    tx: Prisma.TransactionClient,
+    agent: {
+      agentId: string;
+      deviceId: string;
+      snapshotRevision: bigint;
+    },
+    payload: InventoryPayloadDto,
+    snapshotHash: string,
+  ): Promise<IngestedDevice> {
+    const lockedDevices = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT "id" FROM "Device" WHERE "id" = ${agent.deviceId} FOR UPDATE
+    `;
+    if (!lockedDevices.length) {
+      throw new NotFoundException("Registered device no longer exists");
+    }
+    await tx.$queryRaw`SELECT "id" FROM "ManagedAgent" WHERE "id" = ${agent.agentId} FOR UPDATE`;
+    const registeredAgent = await tx.managedAgent.findFirst({
+      where: {
+        id: agent.agentId,
+        deviceId: agent.deviceId,
+        status: AgentRegistrationStatus.ENABLED,
+      },
+      select: {
+        id: true,
+        inventoryRevision: true,
+        lastAppliedInventoryRevision: true,
+        lastAppliedInventoryHash: true,
+      },
+    });
+    if (!registeredAgent) {
+      throw new UnauthorizedException("Managed agent registration is not enabled");
+    }
+    if (agent.snapshotRevision > registeredAgent.inventoryRevision) {
+      throw new BadRequestException("Inventory revision was not issued by the server");
+    }
+    if (agent.snapshotRevision < registeredAgent.inventoryRevision) {
+      throw new StaleInventoryRevisionException(
+        "Inventory snapshot was superseded by a newer server-issued revision",
+      );
+    }
+    if (
+      registeredAgent.lastAppliedInventoryRevision === agent.snapshotRevision
+    ) {
+      if (registeredAgent.lastAppliedInventoryHash === snapshotHash) {
+        return {
+          id: agent.deviceId,
+          computerName: payload.computerName,
+          duplicate: true,
+        };
+      }
+      throw new StaleInventoryRevisionException(
+        "Inventory revision was already applied with different content",
+      );
+    }
+    if (
+      registeredAgent.lastAppliedInventoryRevision !== null &&
+      registeredAgent.lastAppliedInventoryRevision > agent.snapshotRevision
+    ) {
+      throw new StaleInventoryRevisionException(
+        "Inventory snapshot is older than the last applied snapshot",
+      );
+    }
+
+    await lockHostname(tx, payload.computerName);
+    await assertHostnameAvailable(tx, payload.computerName, agent.deviceId);
+    return tx.device.update({
+      where: { id: agent.deviceId },
+      data: {
+        computerName: payload.computerName,
+        loggedInUser: payload.loggedInUser,
+        osName: payload.osName,
+        osVersion: payload.osVersion,
+        osBuild: payload.osBuild,
+        domain: payload.domain,
+        lastSeenAt: new Date(),
+      },
+      select: { id: true, computerName: true },
+    });
   }
 
   private parseInstallDate(value?: string): Date | undefined {
@@ -364,11 +571,41 @@ export class InventoryService {
     return match?.branch ?? null;
   }
 
-  async deleteDevice(id: string) {
-    const result = await this.prisma.device.deleteMany({ where: { id } });
-    if (result.count === 0) {
-      throw new NotFoundException(`Device ${id} was not found`);
-    }
+  async deleteDevice(
+    id: string,
+    actor?: { id: string; username: string },
+  ) {
+    await this.prisma.$transaction(async (tx) => {
+      const devices = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "Device" WHERE "id" = ${id} FOR UPDATE
+      `;
+      if (!devices.length) throw new NotFoundException(`Device ${id} was not found`);
+
+      await tx.$queryRaw`SELECT "id" FROM "ManagedAgent" WHERE "deviceId" = ${id} FOR UPDATE`;
+      const managedAgent = await tx.managedAgent.findUnique({
+        where: { deviceId: id },
+        select: { id: true, status: true },
+      });
+      if (managedAgent?.status === AgentRegistrationStatus.ENABLED) {
+        throw new ConflictException(
+          "Disable or revoke the managed agent registration before deleting this device",
+        );
+      }
+      if (managedAgent) {
+        await tx.agentAuditEvent.create({
+          data: {
+            agentId: managedAgent.id,
+            deviceId: id,
+            actorAdminId: actor?.id,
+            actorUsername: actor?.username,
+            eventType: "DEVICE_DELETED",
+            outcome: "SUCCEEDED",
+            details: { registrationStatus: managedAgent.status },
+          },
+        });
+      }
+      await tx.device.delete({ where: { id } });
+    });
     return { id, status: "deleted" };
   }
 

@@ -1,4 +1,0 @@
-Testing Jira Connection
-Testing SCRUM-2 Integration
-Testing SCRUM-2 Integration
-Testing SCRUM-6 Integration
