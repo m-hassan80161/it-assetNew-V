@@ -4,6 +4,7 @@
     <OutputName>ITAM.InventoryAgent</OutputName>
     <InstallerPlatform>x64</InstallerPlatform>
     <PublishDirectory Condition="'$(PublishDirectory)' == ''">$(MSBuildThisFileDirectory)..\publish</PublishDirectory>
-    <DefineConstants>PublishDirectory=$(PublishDirectory);ProductVersion=$(Version)</DefineConstants>
+    <MsiProductVersion Condition="'$(MsiProductVersion)' == ''">$(Version)</MsiProductVersion>
+    <DefineConstants>PublishDirectory=$(PublishDirectory);ProductVersion=$(MsiProductVersion)</DefineConstants>
   </PropertyGroup>
 </Project>

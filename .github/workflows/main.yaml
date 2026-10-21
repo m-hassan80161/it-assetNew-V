@@ -174,18 +174,18 @@ jobs:
           file: ./backend/Dockerfile.prod
           load: true
           tags: |
-            itam-backend:${{ github.sha }}
-            itam-backend:latest
+            itamv2-backend:${{ github.sha }}
+            itamv2-backend:latest
 
-          cache-from: type=gha,scope=itam-backend
-          cache-to: type=gha,mode=max,scope=itam-backend
+          cache-from: type=gha,scope=itamv2-backend
+          cache-to: type=gha,mode=max,scope=itamv2-backend
 
 
       - name: Scan Backend Image with Trivy
         if: contains(github.event.head_commit.message, 'scan')
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: 'itam-backend:${{ github.sha }}'
+          image-ref: 'itamv2-backend:${{ github.sha }}'
           format: 'table'
           exit-code: '0'
           ignore-unfixed: true
@@ -202,18 +202,18 @@ jobs:
           context: ./frontend
           load: true
           tags: |
-            itam-frontend:${{ github.sha }}
-            itam-frontend:latest
+            itamv2-frontend:${{ github.sha }}
+            itamv2-frontend:latest
 
-          cache-from: type=gha,scope=itam-frontend
-          cache-to: type=gha,mode=max,scope=itam-frontend
+          cache-from: type=gha,scope=itamv2-frontend
+          cache-to: type=gha,mode=max,scope=itamv2-frontend
 
 
       - name: Scan Frontend Image with Trivy
         if: contains(github.event.head_commit.message, 'scan')
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: 'itam-frontend:${{ github.sha }}'
+          image-ref: 'itamv2-frontend:${{ github.sha }}'
           format: 'table'
           exit-code: '0'
           ignore-unfixed: true
@@ -230,18 +230,18 @@ jobs:
           context: ./nginx
           load: true
           tags: |
-            itam-nginx:${{ github.sha }}
-            itam-nginx:latest
+            itamv2-nginx:${{ github.sha }}
+            itamv2-nginx:latest
 
-          cache-from: type=gha,scope=itam-nginx
-          cache-to: type=gha,mode=max,scope=itam-nginx
+          cache-from: type=gha,scope=itamv2-nginx
+          cache-to: type=gha,mode=max,scope=itamv2-nginx
 
 
       - name: Scan Nginx Image with Trivy
         if: contains(github.event.head_commit.message, 'scan')
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: 'itam-nginx:${{ github.sha }}'
+          image-ref: 'itamv2-nginx:${{ github.sha }}'
           format: 'table'
           exit-code: '0'
           ignore-unfixed: true
@@ -258,15 +258,15 @@ jobs:
         if: contains(github.event.head_commit.message, 'build')
         run: |
           docker save \
-            itam-backend:${{ github.sha }} \
+            itamv2-backend:${{ github.sha }} \
             -o backend-image.tar
 
           docker save \
-            itam-frontend:${{ github.sha }} \
+            itamv2-frontend:${{ github.sha }} \
             -o frontend-image.tar
 
           docker save \
-            itam-nginx:${{ github.sha }} \
+            itamv2-nginx:${{ github.sha }} \
             -o nginx-image.tar
 
 
@@ -278,7 +278,7 @@ jobs:
         if: contains(github.event.head_commit.message, 'build')
         uses: actions/upload-artifact@v4
         with:
-          name: itam-backend-image
+          name: itamv2-backend-image
           path: backend-image.tar
           retention-days: 1
 
@@ -286,7 +286,7 @@ jobs:
         if: contains(github.event.head_commit.message, 'build')
         uses: actions/upload-artifact@v4
         with:
-          name: itam-frontend-image
+          name: itamv2-frontend-image
           path: frontend-image.tar
           retention-days: 1
 
@@ -294,7 +294,7 @@ jobs:
         if: contains(github.event.head_commit.message, 'build')
         uses: actions/upload-artifact@v4
         with:
-          name: itam-nginx-image
+          name: itamv2-nginx-image
           path: nginx-image.tar
           retention-days: 1
 
@@ -336,7 +336,7 @@ jobs:
       - name: Download Backend Image
         uses: actions/download-artifact@v4
         with:
-          name: itam-backend-image
+          name: itamv2-backend-image
 
 
       # ------------------------------------------------------------
@@ -345,7 +345,7 @@ jobs:
       - name: Download Frontend Image
         uses: actions/download-artifact@v4
         with:
-          name: itam-frontend-image
+          name: itamv2-frontend-image
 
 
       # ------------------------------------------------------------
@@ -354,7 +354,7 @@ jobs:
       - name: Download Nginx Image
         uses: actions/download-artifact@v4
         with:
-          name: itam-nginx-image
+          name: itamv2-nginx-image
 
 
       # ------------------------------------------------------------
@@ -374,18 +374,18 @@ jobs:
         run: |
           echo "=== Docker Images ==="
 
-          docker images | grep itam-
+          docker images | grep itamv2-
 
           echo ""
           echo "=== Image IDs ==="
 
-          docker image inspect itam-backend:${{ github.sha }} \
+          docker image inspect itamv2-backend:${{ github.sha }} \
             --format='Backend: {{.Id}}'
 
-          docker image inspect itam-frontend:${{ github.sha }} \
+          docker image inspect itamv2-frontend:${{ github.sha }} \
             --format='Frontend: {{.Id}}'
 
-          docker image inspect itam-nginx:${{ github.sha }} \
+          docker image inspect itamv2-nginx:${{ github.sha }} \
             --format='Nginx: {{.Id}}'
 
 
@@ -407,12 +407,12 @@ jobs:
       - name: Tag Backend Image
         run: |
           docker tag \
-            itam-backend:${{ github.sha }} \
-            ${{ secrets.DOCKERHUB_USERNAME }}/itam-backend:${{ github.sha }}
+            itamv2-backend:${{ github.sha }} \
+            ${{ secrets.DOCKERHUB_USERNAME }}/itamv2-backend:${{ github.sha }}
 
           docker tag \
-            itam-backend:${{ github.sha }} \
-            ${{ secrets.DOCKERHUB_USERNAME }}/itam-backend:latest
+            itamv2-backend:${{ github.sha }} \
+            ${{ secrets.DOCKERHUB_USERNAME }}/itamv2-backend:latest
 
 
       # ============================================================
@@ -422,12 +422,12 @@ jobs:
       - name: Tag Frontend Image
         run: |
           docker tag \
-            itam-frontend:${{ github.sha }} \
-            ${{ secrets.DOCKERHUB_USERNAME }}/itam-frontend:${{ github.sha }}
+            itamv2-frontend:${{ github.sha }} \
+            ${{ secrets.DOCKERHUB_USERNAME }}/itamv2-frontend:${{ github.sha }}
 
           docker tag \
-            itam-frontend:${{ github.sha }} \
-            ${{ secrets.DOCKERHUB_USERNAME }}/itam-frontend:latest
+            itamv2-frontend:${{ github.sha }} \
+            ${{ secrets.DOCKERHUB_USERNAME }}/itamv2-frontend:latest
 
 
       # ============================================================
@@ -437,12 +437,12 @@ jobs:
       - name: Tag Nginx Image
         run: |
           docker tag \
-            itam-nginx:${{ github.sha }} \
-            ${{ secrets.DOCKERHUB_USERNAME }}/itam-nginx:${{ github.sha }}
+            itamv2-nginx:${{ github.sha }} \
+            ${{ secrets.DOCKERHUB_USERNAME }}/itamv2-nginx:${{ github.sha }}
 
           docker tag \
-            itam-nginx:${{ github.sha }} \
-            ${{ secrets.DOCKERHUB_USERNAME }}/itam-nginx:latest
+            itamv2-nginx:${{ github.sha }} \
+            ${{ secrets.DOCKERHUB_USERNAME }}/itamv2-nginx:latest
 
 
       # ============================================================
@@ -452,10 +452,10 @@ jobs:
       - name: Push Backend Image
         run: |
           docker push \
-            ${{ secrets.DOCKERHUB_USERNAME }}/itam-backend:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/itamv2-backend:${{ github.sha }}
 
           docker push \
-            ${{ secrets.DOCKERHUB_USERNAME }}/itam-backend:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/itamv2-backend:latest
 
 
       # ============================================================
@@ -465,10 +465,10 @@ jobs:
       - name: Push Frontend Image
         run: |
           docker push \
-            ${{ secrets.DOCKERHUB_USERNAME }}/itam-frontend:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/itamv2-frontend:${{ github.sha }}
 
           docker push \
-            ${{ secrets.DOCKERHUB_USERNAME }}/itam-frontend:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/itamv2-frontend:latest
 
 
       # ============================================================
@@ -478,7 +478,7 @@ jobs:
       - name: Push Nginx Image
         run: |
           docker push \
-            ${{ secrets.DOCKERHUB_USERNAME }}/itam-nginx:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/itamv2-nginx:${{ github.sha }}
 
           docker push \
-            ${{ secrets.DOCKERHUB_USERNAME }}/itam-nginx:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/itamv2-nginx:latest

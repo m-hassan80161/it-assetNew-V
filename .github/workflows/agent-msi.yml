@@ -1,13 +1,10 @@
 name: C# Agent MSI
 
 on:
-  pu
   push:
     paths:
       - "agent/**"
       - ".github/workflows/agent-msi.yml"
-      - branches:
-        - main
   pull_request:
     paths:
       - "agent/**"
@@ -86,14 +83,14 @@ jobs:
           dotnet build agent/installer/Itam.Agent.Installer.wixproj `
             --configuration Release `
             "-p:PublishDirectory=$publishV1Directory" `
-            "-p:Version=0.1.0" `
+            "-p:MsiProductVersion=0.1.0" `
             "-p:OutputPath=$versionOneDirectory"
           if ($LASTEXITCODE -ne 0) { throw "Version 0.1.0 MSI build failed." }
 
           dotnet build agent/installer/Itam.Agent.Installer.wixproj `
             --configuration Release `
             "-p:PublishDirectory=$publishV2Directory" `
-            "-p:Version=0.1.1" `
+            "-p:MsiProductVersion=0.1.1" `
             "-p:OutputPath=$versionTwoDirectory"
           if ($LASTEXITCODE -ne 0) { throw "Version 0.1.1 MSI build failed." }
 
@@ -119,8 +116,9 @@ jobs:
 
           $metadataOne = Get-MsiMetadata $versionOneMsi.FullName
           $metadataTwo = Get-MsiMetadata $versionTwoMsi.FullName
+          Write-Host "MSI metadata: v1='$($metadataOne.Version)' v2='$($metadataTwo.Version)'"
           if ($metadataOne.Version -ne "0.1.0" -or $metadataTwo.Version -ne "0.1.1") {
-            throw "MSI product-version metadata does not match the requested versions."
+            throw "MSI ProductVersion values '$($metadataOne.Version)' and '$($metadataTwo.Version)' do not match requested values '0.1.0' and '0.1.1'."
           }
           if ($metadataOne.Template -notmatch "^x64;" -or $metadataTwo.Template -notmatch "^x64;") {
             throw "An MSI does not declare the expected x64 platform."

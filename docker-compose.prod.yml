@@ -28,7 +28,7 @@ services:
 
 
   backend:
-    image: ${DOCKERHUB_USERNAME}/itam-backend:${IMAGE_TAG}
+    image: ${DOCKERHUB_USERNAME}/itamv2-backend:${IMAGE_TAG}
     container_name: itam_backend
     restart: unless-stopped
 
@@ -55,7 +55,7 @@ services:
 
 
   frontend:
-    image: ${DOCKERHUB_USERNAME}/itam-frontend:${IMAGE_TAG}
+    image: ${DOCKERHUB_USERNAME}/itamv2-frontend:${IMAGE_TAG}
     container_name: itam_frontend
     restart: unless-stopped
 
@@ -70,7 +70,7 @@ services:
 
 
   nginx:
-    image: ${DOCKERHUB_USERNAME}/itam-nginx:${IMAGE_TAG}
+    image: ${DOCKERHUB_USERNAME}/itamv2-nginx:${IMAGE_TAG}
     container_name: itam_proxy
     restart: unless-stopped
     ports:
